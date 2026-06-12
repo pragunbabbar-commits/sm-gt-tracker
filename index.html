@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swiss Military · GT Distribution Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F4F6F8;color:#1A202C;font-size:14px;line-height:1.5}
+:root{
+  --bg:#F4F6F8;--surface:#fff;--border:#E2E8F0;--text:#1A202C;--muted:#718096;
+  --gold:#C9A84C;--gold-bg:#FEF9EC;--gold-border:#F6E097;
+  --green:#38A169;--green-bg:#F0FFF4;--green-border:#9AE6B4;
+  --amber:#D97706;--amber-bg:#FFFBEB;--amber-border:#FCD34D;
+  --red:#E53E3E;--red-bg:#FFF5F5;--red-border:#FCA5A5;
+  --blue:#3182CE;--blue-bg:#EBF8FF;
+  --radius:8px;--shadow:0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md:0 4px 6px -1px rgba(0,0,0,0.08),0 2px 4px -1px rgba(0,0,0,0.04)
+}
+
+/* NAV */
+.nav{background:#fff;border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;height:58px;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.nav-brand{display:flex;align-items:center;gap:10px;margin-right:36px;text-decoration:none}
+.nav-logo{width:32px;height:32px;background:var(--gold);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;letter-spacing:-0.5px;flex-shrink:0}
+.nav-name{font-weight:700;font-size:15px;color:var(--text);line-height:1.2}
+.nav-sub{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px}
+.nav-links{display:flex;gap:2px;flex:1}
+.nav-link{padding:7px 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;transition:all 0.15s;border:none;background:none;outline:none}
+.nav-link:hover{background:var(--bg);color:var(--text)}
+.nav-link.active{background:var(--gold-bg);color:var(--gold)}
+.nav-actions{display:flex;gap:8px;margin-left:auto}
+
+/* BUTTONS */
+.btn{padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;outline:none}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-xs{padding:3px 9px;font-size:11px}
+.btn-ghost{background:none;color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--bg);color:var(--text)}
+.btn-gold{background:var(--gold);color:#fff}
+.btn-gold:hover{background:#b8963e}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:#2b6cb0}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{background:#2f855a}
+.btn-danger{background:none;color:var(--red);border:1px solid var(--red-border)}
+.btn-danger:hover{background:var(--red-bg)}
+
+/* PAGES */
+.page{display:none;padding:28px;max-width:1200px;margin:0 auto}
+.page.active{display:block}
+
+/* ALERT BANNERS */
+.alert{border-radius:var(--radius);padding:11px 16px;margin-bottom:16px;font-size:13px;display:flex;align-items:center;gap:10px;border:1px solid}
+.alert-warn{background:var(--amber-bg);border-color:var(--amber-border);color:#92400E}
+.alert-danger{background:var(--red-bg);border-color:var(--red-border);color:#991B1B}
+.alert-info{background:var(--blue-bg);border-color:#BEE3F8;color:#1A365D}
+
+/* STAT CARDS */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.stat-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);margin-bottom:6px}
+.stat-value{font-size:28px;font-weight:700;color:var(--text);line-height:1}
+.stat-sub{font-size:12px;color:var(--muted);margin-top:5px}
+.stat-value.green{color:var(--green)}
+.stat-value.amber{color:var(--amber)}
+.stat-value.red{color:var(--red)}
+
+/* STATE CARDS GRID */
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text)}
+.section-hint{font-size:12px;color:var(--muted)}
+.state-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.state-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);cursor:pointer;transition:all 0.15s;border-left:4px solid var(--border)}
+.state-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.state-card.rag-green{border-left-color:var(--green)}
+.state-card.rag-amber{border-left-color:var(--amber)}
+.state-card.rag-red{border-left-color:var(--red)}
+.state-card.rag-grey{border-left-color:#CBD5E0}
+.sc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px}
+.sc-name{font-size:15px;font-weight:600;color:var(--text)}
+.sc-zone{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:12px}
+.sc-metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+.sc-metric-label{font-size:10px;text-transform:uppercase;letter-spacing:0.3px;color:var(--muted)}
+.sc-metric-val{font-size:13px;font-weight:600;color:var(--text);margin-top:1px}
+.pct-bar{height:3px;background:var(--border);border-radius:2px;margin-top:4px}
+.pct-fill{height:100%;border-radius:2px;transition:width 0.3s}
+.sc-footer{display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--border)}
+.sc-review{font-size:11px;color:var(--muted)}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-red{background:var(--red-bg);color:var(--red)}
+.badge-green{background:var(--green-bg);color:var(--green)}
+.badge-amber{background:var(--amber-bg);color:var(--amber)}
+.badge-gold{background:var(--gold-bg);color:var(--gold)}
+.badge-blue{background:var(--blue-bg);color:var(--blue)}
+.badge-grey{background:var(--bg);color:var(--muted)}
+.badge-active{background:var(--green-bg);color:var(--green)}
+.badge-partial{background:var(--amber-bg);color:var(--amber)}
+.badge-inactive{background:var(--bg);color:var(--muted)}
+.badge-removed{background:var(--red-bg);color:var(--red)}
+
+/* STATE DETAIL PAGE */
+.state-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
+.breadcrumb{font-size:12px;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px}
+.breadcrumb:hover{color:var(--text)}
+.page-title{font-size:22px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:10px}
+.state-meta{font-size:12px;color:var(--muted);margin-top:3px}
+.state-hdr-actions{display:flex;gap:10px;padding-top:4px}
+
+/* INNER TABS */
+.tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:22px;gap:0}
+.tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.15s;display:flex;align-items:center;gap:6px}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.tab-pill{background:var(--red);color:#fff;border-radius:20px;font-size:10px;padding:1px 6px;font-weight:600}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.card-sm{padding:14px 16px}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;padding:9px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--muted);border-bottom:2px solid var(--border);font-weight:600;white-space:nowrap}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover td{background:#FAFBFC}
+.tbl-sm th,.tbl-sm td{padding:7px 10px}
+
+/* ACCORDION */
+.acc{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:12px}
+.acc-head{padding:14px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:var(--surface);user-select:none}
+.acc-head:hover{background:#FAFBFC}
+.acc-arrow{color:var(--muted);font-size:11px;transition:transform 0.2s;margin-left:8px}
+.acc-head.open .acc-arrow{transform:rotate(90deg)}
+.acc-body{display:none;padding:16px;border-top:1px solid var(--border);background:var(--bg)}
+.acc-body.open{display:block}
+
+/* ACTION ITEMS */
+.action-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px}
+.ai-text{flex:1;font-size:13px;color:var(--text)}
+.ai-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.ai-actions{display:flex;gap:6px;flex-shrink:0;padding-top:1px}
+.overdue-chip{background:var(--red-bg);color:var(--red);font-size:10px;padding:1px 6px;border-radius:4px;font-weight:500;margin-left:6px}
+
+/* REVIEW ITEMS */
+.review-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.review-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.review-date{font-size:14px;font-weight:600;color:var(--text)}
+.review-by{font-size:12px;color:var(--muted);margin-top:2px}
+.review-chips{display:flex;gap:6px;flex-wrap:wrap}
+.review-section{margin-top:10px}
+.review-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:3px}
+.review-section-body{font-size:13px;color:var(--text)}
+
+/* FORMS */
+.form-group{margin-bottom:16px}
+.form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--text);margin-bottom:6px;display:block}
+.form-input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;color:var(--text);background:var(--surface);outline:none;transition:border-color 0.15s;font-family:inherit}
+.form-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,0.1)}
+.form-textarea{resize:vertical;min-height:70px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.form-hint{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:200;align-items:flex-start;justify-content:center;padding:36px 20px;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:12px;width:100%;max-width:780px;box-shadow:0 20px 60px rgba(0,0,0,0.18);margin:auto}
+.modal-sm{max-width:480px}
+.modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:16px;font-weight:700;color:var(--text)}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1;padding:2px 6px;border-radius:4px}
+.modal-close:hover{background:var(--bg);color:var(--text)}
+.modal-body{padding:24px}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+
+/* MISC */
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-icon{font-size:36px;margin-bottom:10px}
+.empty-title{font-size:14px;font-weight:500;color:var(--text);margin-bottom:4px}
+.empty-sub{font-size:13px}
+hr{border:none;border-top:1px solid var(--border);margin:20px 0}
+.green-text{color:var(--green)}
+.amber-text{color:var(--amber)}
+.red-text{color:var(--red)}
+.muted-text{color:var(--muted)}
+.gold-text{color:var(--gold)}
+.fw-600{font-weight:600}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+
+/* TEAM */
+.zone-block{margin-bottom:24px}
+.zone-label{font-size:13px;font-weight:700;padding:10px 14px;border-radius:var(--radius);margin-bottom:10px;border-left:4px solid}
+.team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.team-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px 15px;box-shadow:var(--shadow)}
+.team-name{font-weight:600;font-size:14px}
+.team-role{font-size:12px;color:var(--muted);margin-top:1px}
+.team-states{font-size:11px;color:var(--blue);margin-top:5px}
+
+/* EXPANSION */
+.exp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.exp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border-left:4px solid}
+.exp-state{font-size:15px;font-weight:700;margin-bottom:4px}
+.exp-reason{font-size:13px;color:var(--muted);margin-bottom:10px}
+.exp-next{font-size:12px;color:var(--blue)}
+
+/* SECTION DIVIDER */
+.sdiv{display:flex;align-items:center;gap:10px;margin:20px 0 14px}
+.sdiv-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);white-space:nowrap}
+.sdiv-line{flex:1;height:1px;background:var(--border)}
+
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+select.form-input{cursor:pointer}
+
+@media(max-width:900px){
+  .state-grid{grid-template-columns:repeat(2,1fr)}
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .team-grid{grid-template-columns:repeat(2,1fr)}
+  .exp-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:600px){
+  .state-grid{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:1fr 1fr}
+  .form-row{grid-template-columns:1fr}
+  .team-grid{grid-template-columns:1fr}
+  .exp-grid{grid-template-columns:1fr}
+  .page{padding:16px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div id="loading-overlay" style="display:flex;position:fixed;inset:0;background:#F4F6F8;z-index:1000;align-items:center;justify-content:center;flex-direction:column;gap:14px">
+  <div style="width:44px;height:44px;background:var(--gold);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;letter-spacing:-0.5px">SM</div>
+  <div style="font-size:16px;font-weight:600;color:#1A202C">Loading...</div>
+  <div style="font-size:13px;color:#718096">Fetching distribution data</div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-brand" onclick="navTo('dashboard')" style="cursor:pointer">
+    <div class="nav-logo">SM</div>
+    <div>
+      <div class="nav-name">Swiss Military</div>
+      <div class="nav-sub">GT Distribution Tracker</div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <button class="nav-link active" id="nav-dashboard" onclick="navTo('dashboard')">Dashboard</button>
+    <button class="nav-link" id="nav-team" onclick="navTo('team')">Sales Team</button>
+    <button class="nav-link" id="nav-expansion" onclick="navTo('expansion')">Expansion</button>
+  </div>
+  <div class="nav-actions">
+    <button class="btn btn-ghost btn-sm" onclick="exportData()">↓ Export</button>
+    <label class="btn btn-ghost btn-sm" style="cursor:pointer">↑ Import<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+  </div>
+</nav>
+
+<!-- PAGE: DASHBOARD -->
+<div class="page active" id="pg-dashboard">
+  <div id="dash-alerts"></div>
+  <div class="stats-row" id="dash-stats"></div>
+  <div class="section-header">
+    <div class="section-title">Active States</div>
+    <div class="section-hint">Click a state to drill in →</div>
+  </div>
+  <div class="state-grid" id="dash-grid"></div>
+</div>
+
+<!-- PAGE: STATE DETAIL -->
+<div class="page" id="pg-state">
+  <div class="state-header">
+    <div>
+      <div class="breadcrumb" onclick="navTo('dashboard')">← Dashboard</div>
+      <div class="page-title" id="st-title">
+        <span id="st-name"></span>
+        <span id="st-status-badge"></span>
+      </div>
+      <div class="state-meta" id="st-meta"></div>
+    </div>
+    <div class="state-hdr-actions">
+      <button class="btn btn-ghost btn-sm" onclick="openNetworkModal()">Edit Network</button>
+      <button class="btn btn-gold" onclick="openReviewModal()">+ Log Review</button>
+    </div>
+  </div>
+  <div class="stats-row" id="st-stats"></div>
+  <div class="tabs">
+    <div class="tab active" id="tab-overview" onclick="setStateTab('overview')">Overview</div>
+    <div class="tab" id="tab-actions" onclick="setStateTab('actions')">Action Items <span class="tab-pill" id="tab-actions-pill" style="display:none">0</span></div>
+    <div class="tab" id="tab-network" onclick="setStateTab('network')">Network</div>
+    <div class="tab" id="tab-reviews" onclick="setStateTab('reviews')">Reviews</div>
+  </div>
+  <div id="st-tab-body"></div>
+</div>
+
+<!-- PAGE: TEAM -->
+<div class="page" id="pg-team">
+  <div id="team-body"></div>
+</div>
+
+<!-- PAGE: EXPANSION -->
+<div class="page" id="pg-expansion">
+  <div style="margin-bottom:22px">
+    <h2 style="font-size:20px;font-weight:700">Expansion Pipeline</h2>
+    <p style="color:var(--muted);font-size:13px;margin-top:3px">States planned for onboarding</p>
+  </div>
+  <div id="expansion-body"></div>
+</div>
+
+<!-- MODAL: LOG REVIEW -->
+<div class="modal-overlay" id="modal-review">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="mreview-title">Log Review</div>
+      <button class="modal-close" onclick="closeModal('modal-review')">×</button>
+    </div>
+    <div class="modal-body" id="mreview-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-review')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveReview()">Save Review</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EDIT NETWORK -->
+<div class="modal-overlay" id="modal-network">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="mnet-title">Edit Network</div>
+      <button class="modal-close" onclick="closeModal('modal-network')">×</button>
+    </div>
+    <div class="modal-body" id="mnet-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-network')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNetwork()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CONFIRM -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <div class="modal-title" id="mconfirm-title">Confirm</div>
+      <button class="modal-close" onclick="closeModal('modal-confirm')">×</button>
+    </div>
+    <div class="modal-body" id="mconfirm-body"></div>
+    <div class="modal-footer" id="mconfirm-footer"></div>
+  </div>
+</div>
+
+<script>
+// ==========================================================
+// SUPABASE CONFIG
+// ==========================================================
+const SUPABASE_URL = 'https://ndsrnrwppoxtfgxalqhc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_G2yzgVDi_jb3nPTGmuHLKg_BZZ0CVwW';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ==========================================================
+// DATA MODEL (populated from Supabase on load)
+// ==========================================================
+let states = [];
+let reviews = [];
+let actionItems = [];
+
+let _page = 'dashboard';
+let _state = null;
+let _stateTab = 'overview';
+let _teamView = 'team';
+let _stateUuidMap = {};   // uuid → state name (for FK lookups on load)
+
+// ==========================================================
+// LOAD DATA FROM SUPABASE
+// ==========================================================
+async function loadData() {
+  const lo = document.getElementById('loading-overlay');
+  if (lo) { lo.style.display = 'flex'; lo.innerHTML = lo.innerHTML; }
+
+  try {
+    const [
+      { data: sData,   error: sErr  },
+      { data: sdData,  error: sdErr },
+      { data: mdData,  error: mdErr },
+      { data: aiData,  error: aiErr },
+      { data: rvData,  error: rvErr },
+      { data: rmdData, error: rmdErr },
+      { data: ralData, error: ralErr }
+    ] = await Promise.all([
+      sb.from('states').select('*').order('created_at'),
+      sb.from('super_dists').select('*').order('id'),
+      sb.from('micro_dists').select('*').order('id'),
+      sb.from('action_items').select('*').order('created_at'),
+      sb.from('reviews').select('*').order('date', { ascending: false }),
+      sb.from('review_md_data').select('*'),
+      sb.from('review_action_links').select('*')
+    ]);
+
+    if (sErr) throw sErr;
+    if (sdErr) throw sdErr;
+    if (mdErr) throw mdErr;
+
+    // Build states
+    _stateUuidMap = {};
+    states = (sData || []).map(s => {
+      _stateUuidMap[s.id] = s.state;
+      return {
+        _id: s.id,
+        state: s.state,
+        zone: s.zone || '',
+        status: s.status || 'active',
+        note: s.note || '',
+        superDistTarget: s.super_dist_target || 0,
+        valueTarget: parseFloat(s.value_target || 0),
+        superDists: []
+      };
+    });
+
+    // Attach super_dists
+    (sdData || []).forEach(sd => {
+      const st = states.find(x => x._id === sd.state_id);
+      if (st) st.superDists.push({
+        id: sd.id,
+        company: sd.company || '',
+        location: sd.location || '',
+        contact: sd.contact || '',
+        appointedDate: sd.appointed_date || '',
+        status: sd.status || 'partial',
+        valueAllocation: parseFloat(sd.value_allocation || 0),
+        microDistTarget: sd.micro_dist_target || 0,
+        microDists: []
+      });
+    });
+
+    // Attach micro_dists
+    const mdDistrictMap = {};
+    (mdData || []).forEach(md => {
+      mdDistrictMap[md.id] = md.district || '';
+      for (const st of states) {
+        const sd = st.superDists.find(x => x.id === md.super_dist_id);
+        if (sd) {
+          sd.microDists.push({
+            id: md.id,
+            district: md.district || '',
+            valueAllocation: parseFloat(md.value_allocation || 0),
+            retailerTarget: md.retailer_target || 0,
+            activeRetailers: md.active_retailers || 0,
+            catARetailers: md.cat_a_retailers || 0,
+            valueAchievement: parseFloat(md.value_achievement || 0)
+          });
+          break;
+        }
+      }
+    });
+
+    // Build action items
+    actionItems = (aiData || []).map(a => ({
+      id: a.id,
+      state: _stateUuidMap[a.state_id] || '',
+      text: a.text || '',
+      addedDate: a.added_date || '',
+      status: a.status || 'open',
+      resolvedDate: a.resolved_date || null
+    }));
+
+    // Build review_md_data lookup
+    const rvMdMap = {};
+    (rmdData || []).forEach(rmd => {
+      if (!rvMdMap[rmd.review_id]) rvMdMap[rmd.review_id] = [];
+      rvMdMap[rmd.review_id].push({
+        mdId: rmd.micro_dist_id,
+        district: mdDistrictMap[rmd.micro_dist_id] || '',
+        valueAchievement: parseFloat(rmd.value_achievement || 0),
+        activeRetailers: rmd.active_retailers || 0,
+        catARetailers: rmd.cat_a_retailers || 0
+      });
+    });
+
+    // Build review_action_links lookup
+    const rvAlMap = {};
+    (ralData || []).forEach(ral => {
+      if (!rvAlMap[ral.review_id]) rvAlMap[ral.review_id] = { resolvedIds:[], carriedIds:[], newActionIds:[] };
+      if (ral.link_type === 'resolved') rvAlMap[ral.review_id].resolvedIds.push(ral.action_item_id);
+      else if (ral.link_type === 'carried') rvAlMap[ral.review_id].carriedIds.push(ral.action_item_id);
+      else if (ral.link_type === 'new') rvAlMap[ral.review_id].newActionIds.push(ral.action_item_id);
+    });
+
+    // Build reviews
+    reviews = (rvData || []).map(r => ({
+      id: r.id,
+      state: _stateUuidMap[r.state_id] || '',
+      date: r.date || '',
+      reviewer: r.reviewer || '',
+      sdCount: r.sd_count || 0,
+      stateValue: parseFloat(r.state_value || 0),
+      wins: r.wins || '',
+      issues: r.issues || '',
+      resolvedIds: (rvAlMap[r.id] || {}).resolvedIds || [],
+      carriedIds:  (rvAlMap[r.id] || {}).carriedIds  || [],
+      newActionIds:(rvAlMap[r.id] || {}).newActionIds || [],
+      mdData: rvMdMap[r.id] || []
+    }));
+
+  } catch (err) {
+    if (lo) lo.innerHTML = `
+      <div style="text-align:center;padding:40px 20px">
+        <div style="font-size:18px;font-weight:700;color:#E53E3E;margin-bottom:8px">Failed to load data</div>
+        <div style="font-size:13px;color:#718096;max-width:360px">${err.message || 'Could not reach Supabase. Check that the schema has been applied.'}</div>
+        <button onclick="loadData()" style="margin-top:20px;padding:9px 24px;background:#C9A84C;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500">Retry</button>
+      </div>`;
+    return;
+  }
+
+  if (lo) lo.style.display = 'none';
+  navTo('dashboard');
+}
+
+// ==========================================================
+// HELPERS
+// ==========================================================
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+function fmtVal(n){
+  if(!n||n===0) return '—';
+  if(n>=10000000) return '&#8377;'+(n/10000000).toFixed(1)+'Cr';
+  if(n>=100000) return '&#8377;'+(n/100000).toFixed(1)+'L';
+  if(n>=1000) return '&#8377;'+(n/1000).toFixed(0)+'K';
+  return '&#8377;'+n;
+}
+
+function pct(a,b){ if(!b||b===0) return null; return Math.round((a/b)*100); }
+function pctS(a,b){ const p=pct(a,b); return p===null?'—':p+'%'; }
+function pctColor(p){ if(p===null) return 'grey'; if(p>=80) return 'green'; if(p>=40) return 'amber'; return 'red'; }
+
+function daysSince(d){ if(!d) return null; return Math.floor((Date.now()-new Date(d))/(86400000)); }
+function todayStr(){ return new Date().toISOString().split('T')[0]; }
+
+function allMDs(s){ return s.superDists.flatMap(sd=>sd.microDists||[]); }
+function activeSDs(s){ return s.superDists.filter(sd=>sd.status!=='removed'); }
+function totalRetAch(s){ return allMDs(s).reduce((a,m)=>a+(m.activeRetailers||0),0); }
+function totalCatA(s){ return allMDs(s).reduce((a,m)=>a+(m.catARetailers||0),0); }
+function totalValAch(s){ return allMDs(s).reduce((a,m)=>a+(m.valueAchievement||0),0); }
+function totalRetTarget(s){ return allMDs(s).reduce((a,m)=>a+(m.retailerTarget||0),0); }
+function totalMDTarget(s){ return s.superDists.reduce((a,sd)=>a+(sd.microDistTarget||0),0); }
+function openAI(sName){ return actionItems.filter(a=>a.state===sName&&a.status==='open'); }
+function lastRev(sName){ return reviews.filter(r=>r.state===sName).sort((a,b)=>b.date.localeCompare(a.date))[0]||null; }
+
+function ragColor(s){
+  const v=pct(totalValAch(s),s.valueTarget);
+  if(v===null) return 'grey';
+  if(v>=80) return 'green';
+  if(v>=40) return 'amber';
+  return 'red';
+}
+
+function reviewLabel(sName){
+  const lr=lastRev(sName);
+  if(!lr) return '<span class="red-text">Never reviewed</span>';
+  const d=daysSince(lr.date);
+  if(d===0) return '<span class="green-text">Reviewed today</span>';
+  if(d<=7) return '<span class="green-text">'+d+'d ago</span>';
+  if(d<=14) return '<span class="amber-text">'+d+'d ago</span>';
+  return '<span class="red-text">'+d+'d ago</span>';
+}
+
+// ==========================================================
+// NAVIGATION
+// ==========================================================
+function navTo(page, stateName){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+
+  _page = page;
+
+  if(page==='state'&&stateName){
+    _state=stateName; _stateTab='overview';
+    document.getElementById('pg-state').classList.add('active');
+    renderStatePage();
+  } else if(page==='team'){
+    document.getElementById('nav-team').classList.add('active');
+    document.getElementById('pg-team').classList.add('active');
+    renderTeamPage();
+  } else if(page==='expansion'){
+    document.getElementById('nav-expansion').classList.add('active');
+    document.getElementById('pg-expansion').classList.add('active');
+    renderExpansionPage();
+  } else {
+    document.getElementById('nav-dashboard').classList.add('active');
+    document.getElementById('pg-dashboard').classList.add('active');
+    renderDashboard();
+  }
+}
+
+// ==========================================================
+// DASHBOARD
+// ==========================================================
+function renderDashboard(){
+  const openAll=actionItems.filter(a=>a.status==='open');
+  const alertStates=[...new Set(openAll.map(a=>a.state))];
+  let alertHtml='';
+  if(alertStates.length>0){
+    alertHtml=`<div class="alert alert-warn">&#9888; <strong>${openAll.length} open action item${openAll.length!==1?'s':''}</strong> across ${alertStates.length} state${alertStates.length!==1?'s':''} &mdash; ${alertStates.join(', ')}</div>`;
+  }
+  document.getElementById('dash-alerts').innerHTML=alertHtml;
+
+  const totalSD=states.reduce((a,s)=>a+activeSDs(s).length,0);
+  const totalSDT=states.reduce((a,s)=>a+(s.superDistTarget||0),0);
+  const totalVal=states.reduce((a,s)=>a+totalValAch(s),0);
+  const totalValT=states.reduce((a,s)=>a+(s.valueTarget||0),0);
+  const totalRet=states.reduce((a,s)=>a+totalRetAch(s),0);
+  const totalRetT=states.reduce((a,s)=>a+totalRetTarget(s),0);
+  const openCount=actionItems.filter(a=>a.status==='open').length;
+
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat-card">
+      <div class="stat-label">Active States</div>
+      <div class="stat-value">13</div>
+      <div class="stat-sub">4 zones covered</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Super Distributors</div>
+      <div class="stat-value ${pctColor(pct(totalSD,totalSDT))}">${totalSD}<span style="font-size:15px;color:var(--muted);font-weight:400"> / ${totalSDT}</span></div>
+      <div class="stat-sub">${pctS(totalSD,totalSDT)} appointed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Value MTD</div>
+      <div class="stat-value" style="font-size:${totalVal>0?'20px':'28px'}">${totalVal>0?fmtVal(totalVal):'—'}</div>
+      <div class="stat-sub">${totalValT>0?'vs target '+fmtVal(totalValT):'No targets set yet'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Open Actions</div>
+      <div class="stat-value ${openCount>0?'red':'green'}">${openCount}</div>
+      <div class="stat-sub">${openCount>0?'Needs attention':'All clear'}</div>
+    </div>
+  `;
+
+  document.getElementById('dash-grid').innerHTML=states.map(s=>{
+    const sdC=activeSDs(s).length;
+    const valAch=totalValAch(s);
+    const valP=pct(valAch,s.valueTarget);
+    const retAch=totalRetAch(s);
+    const retP=pct(retAch,totalRetTarget(s));
+    const aiC=openAI(s.state).length;
+    const rag=ragColor(s);
+
+    return `<div class="state-card rag-${rag}" onclick="navTo('state','${s.state}')">
+      <div class="sc-head">
+        <div class="sc-name">${s.state}</div>
+        ${aiC>0?`<span class="badge badge-red">${aiC} open</span>`:''}
+      </div>
+      <div class="sc-zone">${s.zone} Zone</div>
+      <div class="sc-metrics">
+        <div>
+          <div class="sc-metric-label">SDs</div>
+          <div class="sc-metric-val">${sdC}/${s.superDistTarget}</div>
+          <div class="pct-bar"><div class="pct-fill" style="width:${Math.min(100,pct(sdC,s.superDistTarget)||0)}%;background:var(--${pctColor(pct(sdC,s.superDistTarget))})"></div></div>
+        </div>
+        <div>
+          <div class="sc-metric-label">Value %</div>
+          <div class="sc-metric-val ${pctColor(valP)}-text">${valP!==null?valP+'%':'—'}</div>
+          <div class="pct-bar"><div class="pct-fill" style="width:${Math.min(100,valP||0)}%;background:var(--${pctColor(valP)})"></div></div>
+        </div>
+        <div>
+          <div class="sc-metric-label">Retailers</div>
+          <div class="sc-metric-val">${retAch}${totalRetTarget(s)>0?'/'+totalRetTarget(s):''}</div>
+          <div class="pct-bar"><div class="pct-fill" style="width:${Math.min(100,retP||0)}%;background:var(--${pctColor(retP)})"></div></div>
+        </div>
+      </div>
+      <div class="sc-footer">
+        <div class="sc-review">Last review: ${reviewLabel(s.state)}</div>
+        <span style="font-size:11px;color:var(--muted)">→</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ==========================================================
+// STATE DETAIL
+// ==========================================================
+function renderStatePage(){
+  const s=states.find(x=>x.state===_state);
+  if(!s) return;
+
+  document.getElementById('st-name').textContent=s.state;
+  document.getElementById('st-meta').textContent=s.zone+' Zone';
+
+  const statusMap={active:'badge-active',partial:'badge-partial',inactive:'badge-inactive',removed:'badge-removed'};
+  document.getElementById('st-status-badge').innerHTML=`<span class="badge ${statusMap[s.status]||'badge-grey'}">${s.status||'active'}</span>`;
+
+  const sdC=activeSDs(s).length;
+  const valAch=totalValAch(s);
+  const valP=pct(valAch,s.valueTarget);
+  const retAch=totalRetAch(s);
+  const retT=totalRetTarget(s);
+  const retP=pct(retAch,retT);
+  const catA=totalCatA(s);
+  const aiC=openAI(s.state).length;
+
+  document.getElementById('st-stats').innerHTML=`
+    <div class="stat-card" style="cursor:pointer;border-bottom:2px solid var(--gold)" onclick="openNetworkModal()">
+      <div class="stat-label">Super Distributors</div>
+      <div class="stat-value ${pctColor(pct(sdC,s.superDistTarget))}">${sdC}<span style="font-size:15px;color:var(--muted);font-weight:400"> / ${s.superDistTarget}</span></div>
+      <div class="stat-sub">${pctS(sdC,s.superDistTarget)} · <span class="gold-text">Edit network</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Value MTD</div>
+      <div class="stat-value" style="font-size:${valAch>0?'20px':'28px'};color:var(--${pctColor(valP)})">${valAch>0?fmtVal(valAch):'—'}</div>
+      <div class="stat-sub">${s.valueTarget>0?'Target: '+fmtVal(s.valueTarget)+' &middot; '+pctS(valAch,s.valueTarget):'No target set'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Retailers</div>
+      <div class="stat-value ${pctColor(retP)}">${retAch}</div>
+      <div class="stat-sub">${retT>0?'Target: '+retT+' &middot; '+pctS(retAch,retT):'No target set'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Cat A Retailers</div>
+      <div class="stat-value">${catA}</div>
+      <div class="stat-sub">${aiC>0?`<span class="red-text">${aiC} open action item${aiC!==1?'s':''}</span>`:'No open actions'}</div>
+    </div>
+  `;
+
+  const pill=document.getElementById('tab-actions-pill');
+  if(aiC>0){pill.textContent=aiC;pill.style.display='inline';}
+  else{pill.style.display='none';}
+
+  renderStateTab();
+}
+
+function setStateTab(tab){
+  _stateTab=tab;
+  document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  renderStateTab();
+}
+
+function renderStateTab(){
+  const el=document.getElementById('st-tab-body');
+  if(_stateTab==='overview') el.innerHTML=buildOverviewTab();
+  else if(_stateTab==='actions') el.innerHTML=buildActionsTab();
+  else if(_stateTab==='network') el.innerHTML=buildNetworkTab();
+  else if(_stateTab==='reviews') el.innerHTML=buildReviewsTab();
+}
+
+// --- OVERVIEW TAB ---
+function buildOverviewTab(){
+  const s=states.find(x=>x.state===_state);
+  if(!s) return '';
+  const lr=lastRev(s.state);
+  const d=lr?daysSince(lr.date):null;
+  let revStatus='<span class="badge badge-red">Never reviewed</span>';
+  if(lr){
+    if(d<=7) revStatus=`<span class="badge badge-green">Reviewed ${d===0?'today':d+'d ago'}</span>`;
+    else if(d<=14) revStatus=`<span class="badge badge-amber">Reviewed ${d}d ago</span>`;
+    else revStatus=`<span class="badge badge-red">Reviewed ${d}d ago</span>`;
+  }
+
+  const sdRows=s.superDists.map(sd=>{
+    const mds=sd.microDists||[];
+    const sdVal=mds.reduce((a,m)=>a+(m.valueAchievement||0),0);
+    const sdRet=mds.reduce((a,m)=>a+(m.activeRetailers||0),0);
+    const sdRetT=mds.reduce((a,m)=>a+(m.retailerTarget||0),0);
+    const vP=pct(sdVal,sd.valueAllocation);
+    return `<tr>
+      <td><div class="fw-600">${sd.company||'—'}</div><div style="font-size:11px;color:var(--muted)">${sd.location||''}</div></td>
+      <td><span class="badge badge-${sd.status||'partial'}">${sd.status||'partial'}</span></td>
+      <td>${sd.valueAllocation>0?fmtVal(sd.valueAllocation):'—'}</td>
+      <td><span class="${vP!==null?(vP>=80?'green-text':vP>=40?'amber-text':'red-text'):'muted-text'} fw-600">${sdVal>0?fmtVal(sdVal):'—'}</span>${vP!==null?` <small style="color:var(--muted)">(${vP}%)</small>`:''}</td>
+      <td>${mds.length} / ${sd.microDistTarget||0}</td>
+      <td>${sdRet}${sdRetT>0?' / '+sdRetT:''}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:10px">${revStatus}${lr&&lr.reviewer?`<span class="muted-text" style="font-size:12px">by ${lr.reviewer}</span>`:''}${d!==null&&d>7?`<span class="muted-text" style="font-size:12px">&mdash; overdue for review</span>`:''}</div>
+    <button class="btn btn-gold btn-sm" onclick="openReviewModal()">+ Log Review</button>
+  </div>
+  <div class="card card-sm">
+    <div class="sdiv"><span class="sdiv-label">SD Scorecard</span><div class="sdiv-line"></div></div>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Distributor</th><th>Status</th><th>Val. Allocation</th><th>Achieved</th><th>MDs</th><th>Retailers</th></tr></thead>
+        <tbody>${sdRows||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">No SDs added — use Edit Network to add</td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>
+  ${s.note?`<div class="card card-sm" style="margin-top:12px"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--muted);margin-bottom:6px">Notes</div><div style="font-size:13px">${s.note}</div></div>`:''}`;
+}
+
+// --- ACTIONS TAB ---
+function buildActionsTab(){
+  const open=actionItems.filter(a=>a.state===_state&&a.status==='open');
+  const resolved=actionItems.filter(a=>a.state===_state&&a.status!=='open');
+
+  let openHtml='';
+  if(open.length===0){
+    openHtml=`<div class="empty-state"><div class="empty-icon">&#10003;</div><div class="empty-title">No open action items</div><div class="empty-sub">Good to go — or add one below</div></div>`;
+  } else {
+    openHtml=open.map(item=>{
+      const d=daysSince(item.addedDate);
+      return `<div class="action-item">
+        <div style="flex:1">
+          <div class="ai-text">${item.text}</div>
+          <div class="ai-meta">Added ${item.addedDate}${d>7?`<span class="overdue-chip">${d}d old</span>`:''}</div>
+        </div>
+        <div class="ai-actions">
+          <button class="btn btn-xs btn-success" onclick="resolveAI('${item.id}')">&#10003; Resolve</button>
+          <button class="btn btn-xs btn-ghost" onclick="carryAI('${item.id}')">Carry forward</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  let resolvedHtml='';
+  if(resolved.length>0){
+    resolvedHtml=`<div style="margin-top:24px">
+      <div class="sdiv"><span class="sdiv-label">Resolved (${resolved.length})</span><div class="sdiv-line"></div></div>
+      ${resolved.slice(0,6).map(item=>`<div style="padding:7px 12px;font-size:12px;color:var(--muted);border-left:2px solid var(--border);margin-bottom:5px"><span style="text-decoration:line-through">${item.text}</span>${item.resolvedDate?` &middot; ${item.resolvedDate}`:''}</div>`).join('')}
+      ${resolved.length>6?`<div style="font-size:12px;color:var(--muted);margin-top:4px">+${resolved.length-6} more resolved</div>`:''}
+    </div>`;
+  }
+
+  return `<div class="sdiv"><span class="sdiv-label">Open (${open.length})</span><div class="sdiv-line"></div></div>
+  ${openHtml}
+  <div class="card card-sm" style="margin-top:16px">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px">Add Action Item</div>
+    <div style="display:flex;gap:10px">
+      <input class="form-input" id="new-ai-text" placeholder="Describe the action..." style="flex:1">
+      <button class="btn btn-primary btn-sm" onclick="addAI()">Add</button>
+    </div>
+  </div>
+  ${resolvedHtml}`;
+}
+
+// --- NETWORK TAB ---
+function buildNetworkTab(){
+  const s=states.find(x=>x.state===_state);
+  if(!s) return '';
+
+  const accHtml=s.superDists.map((sd,i)=>{
+    const mds=sd.microDists||[];
+    const sdValAch=mds.reduce((a,m)=>a+(m.valueAchievement||0),0);
+    const mdRows=mds.map(md=>`<tr>
+      <td>${md.district}</td>
+      <td>${md.valueAllocation>0?fmtVal(md.valueAllocation):'—'}</td>
+      <td class="fw-600 ${pct(md.valueAchievement,md.valueAllocation)!==null?(pct(md.valueAchievement,md.valueAllocation)>=80?'green-text':pct(md.valueAchievement,md.valueAllocation)>=40?'amber-text':'red-text'):''}">${md.valueAchievement>0?fmtVal(md.valueAchievement):'—'}</td>
+      <td>${md.activeRetailers}${md.retailerTarget>0?' / '+md.retailerTarget:''}</td>
+      <td>${md.catARetailers}</td>
+    </tr>`).join('');
+
+    return `<div class="acc">
+      <div class="acc-head" onclick="toggleAcc(this)">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="fw-600">${sd.company||'[Company not set]'}</span>
+          <span style="font-size:12px;color:var(--muted)">${sd.location||''}</span>
+          <span class="badge badge-${sd.status||'partial'}">${sd.status||'partial'}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <span style="font-size:12px;color:var(--muted)">${mds.length} MDs &middot; ${sdValAch>0?fmtVal(sdValAch)+' achieved':'No data yet'}</span>
+          <span class="acc-arrow">&#9654;</span>
+        </div>
+      </div>
+      <div class="acc-body">
+        <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--muted);margin-bottom:12px">
+          ${sd.contact?`<span>&#128222; ${sd.contact}</span>`:''}
+          ${sd.appointedDate?`<span>&#128197; Appointed: ${sd.appointedDate}</span>`:''}
+          <span>Val. Alloc: ${sd.valueAllocation>0?fmtVal(sd.valueAllocation):'Not set'}</span>
+          <span>MD Target: ${sd.microDistTarget||0}</span>
+        </div>
+        <table class="tbl tbl-sm" style="background:white;border:1px solid var(--border);border-radius:6px">
+          <thead><tr><th>District</th><th>Val. Allocation</th><th>Val. Achieved</th><th>Retailers</th><th>Cat A</th></tr></thead>
+          <tbody>${mdRows||'<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px">No MDs added</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div class="sdiv" style="margin:0;flex:1"><span class="sdiv-label">Distribution Network</span><div class="sdiv-line" style="margin-left:10px"></div></div>
+    <button class="btn btn-ghost btn-sm" style="margin-left:16px" onclick="openNetworkModal()">Edit Network</button>
+  </div>
+  ${accHtml||'<div class="empty-state"><div class="empty-icon">&#127970;</div><div class="empty-title">No distributors added yet</div><div class="empty-sub">Use Edit Network to add SDs and MDs</div></div>'}`;
+}
+
+// --- REVIEWS TAB ---
+function buildReviewsTab(){
+  const stRevs=reviews.filter(r=>r.state===_state).sort((a,b)=>b.date.localeCompare(a.date));
+
+  if(stRevs.length===0){
+    return `<div class="empty-state">
+      <div class="empty-icon">&#128203;</div>
+      <div class="empty-title">No reviews logged yet</div>
+      <div class="empty-sub">Start tracking state performance and action items</div>
+      <button class="btn btn-gold" style="margin-top:16px" onclick="openReviewModal()">+ Log First Review</button>
+    </div>`;
+  }
+
+  const html=stRevs.map(r=>{
+    const resolvedN=(r.resolvedIds||[]).length;
+    const newN=(r.newActionIds||[]).length;
+    return `<div class="review-item">
+      <div class="review-head">
+        <div>
+          <div class="review-date">${r.date}</div>
+          ${r.reviewer?`<div class="review-by">${r.reviewer}</div>`:''}
+        </div>
+        <div class="review-chips">
+          ${r.sdCount!==undefined?`<span class="badge badge-blue">${r.sdCount} SDs</span>`:''}
+          ${r.stateValue?`<span class="badge badge-green">${fmtVal(r.stateValue)} MTD</span>`:''}
+          ${resolvedN>0?`<span class="badge badge-green">${resolvedN} resolved</span>`:''}
+          ${newN>0?`<span class="badge badge-amber">${newN} new actions</span>`:''}
+        </div>
+      </div>
+      ${r.wins?`<div class="review-section"><div class="review-section-label">Wins</div><div class="review-section-body">${r.wins}</div></div>`:''}
+      ${r.issues?`<div class="review-section"><div class="review-section-label">Issues</div><div class="review-section-body">${r.issues}</div></div>`:''}
+      ${r.mdData&&r.mdData.length>0?`<div class="review-section"><div class="review-section-label">MD Performance</div>
+        <table class="tbl tbl-sm" style="margin-top:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+          <thead><tr><th>District</th><th>Value</th><th>Retailers</th><th>Cat A</th></tr></thead>
+          <tbody>${r.mdData.map(m=>`<tr><td>${m.district}</td><td>${m.valueAchievement>0?fmtVal(m.valueAchievement):'—'}</td><td>${m.activeRetailers||0}</td><td>${m.catARetailers||0}</td></tr>`).join('')}</tbody>
+        </table></div>`:''}
+    </div>`;
+  }).join('');
+
+  return `<div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+    <button class="btn btn-gold btn-sm" onclick="openReviewModal()">+ Log Review</button>
+  </div>${html}`;
+}
+
+// ==========================================================
+// REVIEW MODAL
+// ==========================================================
+function openReviewModal(){
+  const s=states.find(x=>x.state===_state);
+  if(!s) return;
+  const open=actionItems.filter(a=>a.state===s.state&&a.status==='open');
+  const mds=allMDs(s);
+
+  document.getElementById('mreview-title').textContent='Log Review — '+s.state;
+
+  const aiHtml=open.length>0?`
+    <div class="form-group">
+      <label class="form-label">Open Action Items <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">&mdash; check to mark resolved</span></label>
+      <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--surface)">
+        ${open.map((a,i)=>`<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:${i<open.length-1?'1px solid var(--border)':'none'};cursor:pointer;font-size:13px">
+          <input type="checkbox" id="ai-res-${a.id}" style="margin-top:2px;cursor:pointer">
+          <div><div>${a.text}</div><div style="font-size:11px;color:var(--muted);margin-top:1px">Added ${a.addedDate}</div></div>
+        </label>`).join('')}
+      </div>
+      <div class="form-hint">Unchecked = carried forward automatically</div>
+    </div>`:'';
+
+  const mdHtml=mds.length>0?`
+    <div class="form-group">
+      <label class="form-label">MD Performance Data <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">&mdash; enter latest numbers</span></label>
+      <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <table class="tbl tbl-sm" style="background:var(--surface)">
+          <thead style="background:var(--bg)"><tr><th>District</th><th>Value Achieved (&#8377;)</th><th>Active Retailers</th><th>Cat A</th></tr></thead>
+          <tbody>${mds.map(md=>`<tr>
+            <td class="fw-600">${md.district}</td>
+            <td><input type="number" class="form-input" id="rv-v-${md.id}" value="${md.valueAchievement||0}" min="0" style="padding:5px 8px;font-size:12px"></td>
+            <td><input type="number" class="form-input" id="rv-r-${md.id}" value="${md.activeRetailers||0}" min="0" style="padding:5px 8px;font-size:12px"></td>
+            <td><input type="number" class="form-input" id="rv-c-${md.id}" value="${md.catARetailers||0}" min="0" style="padding:5px 8px;font-size:12px"></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`:'';
+
+  document.getElementById('mreview-body').innerHTML=`
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Review Date</label>
+        <input type="date" class="form-input" id="rv-date" value="${todayStr()}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reviewed By</label>
+        <input class="form-input" id="rv-reviewer" placeholder="Name or designation">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Active SDs Present</label>
+        <input type="number" class="form-input" id="rv-sdcount" value="${activeSDs(s).length}" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">State Value MTD (&#8377;)</label>
+        <input type="number" class="form-input" id="rv-stateval" placeholder="0" min="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Wins &amp; Highlights</label>
+      <textarea class="form-input form-textarea" id="rv-wins" placeholder="What went well this period..."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Issues &amp; Challenges</label>
+      <textarea class="form-input form-textarea" id="rv-issues" placeholder="Blockers, gaps, underperformance..."></textarea>
+    </div>
+    ${aiHtml}
+    ${mdHtml}
+    <div class="form-group">
+      <label class="form-label">New Action Items <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(one per line)</span></label>
+      <textarea class="form-input form-textarea" id="rv-newai" placeholder="Follow up on SD appointment&#10;Get retailer list from Lucknow MD"></textarea>
+    </div>
+  `;
+  document.getElementById('modal-review').classList.add('open');
+}
+
+async function saveReview(){
+  const s=states.find(x=>x.state===_state);
+  if(!s) return;
+
+  const date=document.getElementById('rv-date').value;
+  if(!date){alert('Please enter a review date.');return;}
+
+  const reviewer=document.getElementById('rv-reviewer').value.trim();
+  const sdCount=+(document.getElementById('rv-sdcount').value||0);
+  const stateValue=+(document.getElementById('rv-stateval').value||0);
+  const wins=document.getElementById('rv-wins').value.trim();
+  const issues=document.getElementById('rv-issues').value.trim();
+
+  // Resolve / carry action items
+  const open=actionItems.filter(a=>a.state===s.state&&a.status==='open');
+  const resolvedIds=[],carriedIds=[];
+  for(const a of open){
+    const cb=document.getElementById('ai-res-'+a.id);
+    if(cb&&cb.checked){
+      a.status='resolved';a.resolvedDate=date;resolvedIds.push(a.id);
+      await sb.from('action_items').update({status:'resolved',resolved_date:date}).eq('id',a.id);
+    } else { carriedIds.push(a.id); }
+  }
+
+  // New action items
+  const raw=document.getElementById('rv-newai').value;
+  const newActionIds=[];
+  const newDbItems=[];
+  raw.split('\n').forEach(line=>{
+    const t=line.trim();
+    if(t){
+      const id=uid();
+      newActionIds.push(id);
+      actionItems.push({id,state:s.state,text:t,addedDate:date,status:'open'});
+      newDbItems.push({id,state_id:s._id,text:t,added_date:date,status:'open'});
+    }
+  });
+  if(newDbItems.length>0){
+    const{error:aiErr}=await sb.from('action_items').insert(newDbItems);
+    if(aiErr){alert('Error saving action items: '+aiErr.message);return;}
+  }
+
+  // MD data — update micro_dists, build review_md_data rows
+  const mds=allMDs(s);
+  const mdData=[],mdDbRows=[];
+  for(const md of mds){
+    const v=+(document.getElementById('rv-v-'+md.id)?.value||0);
+    const r=+(document.getElementById('rv-r-'+md.id)?.value||0);
+    const c=+(document.getElementById('rv-c-'+md.id)?.value||0);
+    md.valueAchievement=v;md.activeRetailers=r;md.catARetailers=c;
+    mdData.push({mdId:md.id,district:md.district,valueAchievement:v,activeRetailers:r,catARetailers:c});
+    mdDbRows.push({micro_dist_id:md.id,value_achievement:v,active_retailers:r,cat_a_retailers:c});
+    await sb.from('micro_dists').update({value_achievement:v,active_retailers:r,cat_a_retailers:c}).eq('id',md.id);
+  }
+
+  // Insert review row
+  const reviewId=uid();
+  const{error:rvErr}=await sb.from('reviews').insert({
+    id:reviewId,state_id:s._id,date,reviewer,
+    sd_count:sdCount,state_value:stateValue,wins,issues
+  });
+  if(rvErr){alert('Error saving review: '+rvErr.message);return;}
+
+  // Insert review_md_data
+  if(mdDbRows.length>0){
+    await sb.from('review_md_data').insert(mdDbRows.map(m=>({...m,review_id:reviewId})));
+  }
+
+  // Insert review_action_links
+  const actionLinks=[
+    ...resolvedIds.map(id=>({review_id:reviewId,action_item_id:id,link_type:'resolved'})),
+    ...carriedIds.map(id=>({review_id:reviewId,action_item_id:id,link_type:'carried'})),
+    ...newActionIds.map(id=>({review_id:reviewId,action_item_id:id,link_type:'new'}))
+  ];
+  if(actionLinks.length>0){
+    await sb.from('review_action_links').insert(actionLinks);
+  }
+
+  reviews.unshift({id:reviewId,state:s.state,date,reviewer,sdCount,stateValue,wins,issues,resolvedIds,carriedIds,newActionIds,mdData});
+  closeModal('modal-review');
+  renderStatePage();
+}
+
+// ==========================================================
+// NETWORK MODAL
+// ==========================================================
+function openNetworkModal(){
+  const s=states.find(x=>x.state===_state);
+  if(!s) return;
+  document.getElementById('mnet-title').textContent='Edit Network — '+s.state;
+
+  let html=`
+    <div class="sdiv"><span class="sdiv-label">State Targets</span><div class="sdiv-line"></div></div>
+    <div class="form-row" style="margin-bottom:20px">
+      <div class="form-group">
+        <label class="form-label">Value Target (&#8377;/month)</label>
+        <input type="number" class="form-input" id="net-vtgt" value="${s.valueTarget||0}" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">SD Target Count</label>
+        <input type="number" class="form-input" id="net-sdtgt" value="${s.superDistTarget||0}" min="0">
+      </div>
+    </div>
+    <div class="sdiv"><span class="sdiv-label">Super Distributors</span><div class="sdiv-line"></div></div>
+  `;
+
+  s.superDists.forEach((sd,i)=>{
+    html+=`<div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:14px;background:var(--bg)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="fw-600" style="font-size:13px">SD ${i+1}</div>
+        <select class="form-input" id="net-sdst-${sd.id}" style="width:130px;padding:5px 8px;font-size:12px">
+          <option value="active" ${sd.status==='active'?'selected':''}>Active</option>
+          <option value="partial" ${sd.status==='partial'?'selected':''}>Partial</option>
+          <option value="inactive" ${sd.status==='inactive'?'selected':''}>Inactive</option>
+          <option value="removed" ${sd.status==='removed'?'selected':''}>Removed</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Company Name</label><input class="form-input" id="net-sdco-${sd.id}" value="${sd.company||''}" placeholder="Company name"></div>
+        <div class="form-group"><label class="form-label">Location</label><input class="form-input" id="net-sdloc-${sd.id}" value="${sd.location||''}" placeholder="City / Region"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Contact</label><input class="form-input" id="net-sdcon-${sd.id}" value="${sd.contact||''}" placeholder="Phone / Name"></div>
+        <div class="form-group"><label class="form-label">Appointed Date</label><input type="date" class="form-input" id="net-sddate-${sd.id}" value="${sd.appointedDate||''}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Value Allocation (&#8377;)</label><input type="number" class="form-input" id="net-sdval-${sd.id}" value="${sd.valueAllocation||0}" min="0"></div>
+        <div class="form-group"><label class="form-label">MD Target</label><input type="number" class="form-input" id="net-sdmdt-${sd.id}" value="${sd.microDistTarget||0}" min="0"></div>
+      </div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin:8px 0">Micro Distributors</div>
+      <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <table class="tbl tbl-sm" style="background:white">
+          <thead style="background:var(--bg)"><tr><th>District</th><th>Val. Alloc (&#8377;)</th><th>Retailer Target</th></tr></thead>
+          <tbody>${(sd.microDists||[]).map(md=>`<tr>
+            <td><input class="form-input" id="net-mdd-${md.id}" value="${md.district||''}" style="padding:4px 7px;font-size:12px"></td>
+            <td><input type="number" class="form-input" id="net-mdv-${md.id}" value="${md.valueAllocation||0}" min="0" style="padding:4px 7px;font-size:12px"></td>
+            <td><input type="number" class="form-input" id="net-mdr-${md.id}" value="${md.retailerTarget||0}" min="0" style="padding:4px 7px;font-size:12px"></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('mnet-body').innerHTML=html;
+  document.getElementById('modal-network').classList.add('open');
+}
+
+async function saveNetwork(){
+  const s=states.find(x=>x.state===_state);
+  if(!s) return;
+
+  const vt=+(document.getElementById('net-vtgt').value||0);
+  const sdt=+(document.getElementById('net-sdtgt').value||0);
+  s.valueTarget=vt; s.superDistTarget=sdt;
+  await sb.from('states').update({value_target:vt,super_dist_target:sdt}).eq('id',s._id);
+
+  for(const sd of s.superDists){
+    const g=id=>document.getElementById(id);
+    if(g('net-sdco-'+sd.id)) sd.company=g('net-sdco-'+sd.id).value.trim();
+    if(g('net-sdloc-'+sd.id)) sd.location=g('net-sdloc-'+sd.id).value.trim();
+    if(g('net-sdcon-'+sd.id)) sd.contact=g('net-sdcon-'+sd.id).value.trim();
+    if(g('net-sddate-'+sd.id)) sd.appointedDate=g('net-sddate-'+sd.id).value;
+    if(g('net-sdval-'+sd.id)) sd.valueAllocation=+g('net-sdval-'+sd.id).value;
+    if(g('net-sdmdt-'+sd.id)) sd.microDistTarget=+g('net-sdmdt-'+sd.id).value;
+    if(g('net-sdst-'+sd.id)) sd.status=g('net-sdst-'+sd.id).value;
+
+    await sb.from('super_dists').upsert({
+      id:sd.id, state_id:s._id,
+      company:sd.company, location:sd.location, contact:sd.contact,
+      appointed_date:sd.appointedDate||null,
+      status:sd.status,
+      value_allocation:sd.valueAllocation,
+      micro_dist_target:sd.microDistTarget
+    });
+
+    for(const md of (sd.microDists||[])){
+      if(g('net-mdd-'+md.id)) md.district=g('net-mdd-'+md.id).value.trim();
+      if(g('net-mdv-'+md.id)) md.valueAllocation=+g('net-mdv-'+md.id).value;
+      if(g('net-mdr-'+md.id)) md.retailerTarget=+g('net-mdr-'+md.id).value;
+
+      await sb.from('micro_dists').upsert({
+        id:md.id, super_dist_id:sd.id,
+        district:md.district,
+        value_allocation:md.valueAllocation,
+        retailer_target:md.retailerTarget,
+        active_retailers:md.activeRetailers,
+        cat_a_retailers:md.catARetailers,
+        value_achievement:md.valueAchievement
+      });
+    }
+  }
+
+  closeModal('modal-network');
+  renderStatePage();
+}
+
+// ==========================================================
+// ACTION ITEM HELPERS
+// ==========================================================
+async function resolveAI(id){
+  const a=actionItems.find(x=>x.id===id);
+  if(a){
+    a.status='resolved';a.resolvedDate=todayStr();
+    await sb.from('action_items').update({status:'resolved',resolved_date:todayStr()}).eq('id',id);
+  }
+  refreshAfterAI();
+}
+function carryAI(id){ refreshAfterAI(); }
+async function addAI(){
+  const inp=document.getElementById('new-ai-text');
+  if(!inp||!inp.value.trim()) return;
+  const s=states.find(x=>x.state===_state);
+  const id=uid();
+  const item={id,state:_state,text:inp.value.trim(),addedDate:todayStr(),status:'open'};
+  actionItems.push(item);
+  await sb.from('action_items').insert({id,state_id:s._id,text:item.text,added_date:item.addedDate,status:'open'});
+  inp.value='';
+  refreshAfterAI();
+}
+function refreshAfterAI(){
+  const aiC=openAI(_state).length;
+  const pill=document.getElementById('tab-actions-pill');
+  if(pill){if(aiC>0){pill.textContent=aiC;pill.style.display='inline';}else{pill.style.display='none';}}
+  renderStateTab();
+}
+
+// ==========================================================
+// ACCORDION
+// ==========================================================
+function toggleAcc(el){
+  el.classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+
+// ==========================================================
+// TEAM PAGE
+// ==========================================================
+function renderTeamPage(){
+  const toggle=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+      <div>
+        <h2 style="font-size:20px;font-weight:700">${_teamView==='team'?'Sales Team':'Channel by State'}</h2>
+        <p style="color:var(--muted);font-size:13px;margin-top:3px">${_teamView==='team'?'Vision Distribution Pvt Ltd — Swiss Military GT':'Super Distributor &rarr; Micro Distributor hierarchy, state-wise'}</p>
+      </div>
+      <div style="display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:3px;gap:2px">
+        <button onclick="switchTeamView('team')" style="padding:6px 16px;border-radius:6px;font-size:12px;font-weight:500;border:none;cursor:pointer;transition:all 0.15s;background:${_teamView==='team'?'var(--surface)':'transparent'};color:${_teamView==='team'?'var(--text)':'var(--muted)'};box-shadow:${_teamView==='team'?'var(--shadow)':'none'}">Sales Team</button>
+        <button onclick="switchTeamView('channel')" style="padding:6px 16px;border-radius:6px;font-size:12px;font-weight:500;border:none;cursor:pointer;transition:all 0.15s;background:${_teamView==='channel'?'var(--surface)':'transparent'};color:${_teamView==='channel'?'var(--text)':'var(--muted)'};box-shadow:${_teamView==='channel'?'var(--shadow)':'none'}">Channel by State</button>
+      </div>
+    </div>`;
+
+  if(_teamView==='team'){
+    const zones=[
+      {name:'National',color:'var(--gold)',bg:'var(--gold-bg)',people:[
+        {name:'Neeraj Bhatt',role:'National Head — GT',states:'All India'}
+      ]},
+      {name:'North Zone',color:'var(--blue)',bg:'var(--blue-bg)',people:[
+        {name:'RSM — UPU',role:'Regional Sales Manager',states:'UP, Delhi, Haryana, J&K, Rajasthan'},
+        {name:'SH — UP',role:'State Head',states:'Uttar Pradesh (Lucknow, West UP)'},
+        {name:'SH — Delhi',role:'State Head',states:'Delhi'},
+        {name:'SH — Haryana',role:'State Head',states:'Haryana · Jammu & Kashmir'},
+        {name:'SH — Rajasthan',role:'State Head',states:'Rajasthan (Jaipur, Kota)'}
+      ]},
+      {name:'East Zone',color:'var(--green)',bg:'var(--green-bg)',people:[
+        {name:'RSM — East',role:'Regional Sales Manager',states:'West Bengal'},
+        {name:'SH — Bengal',role:'State Head',states:'West Bengal (Kolkata)'}
+      ]},
+      {name:'West Zone',color:'var(--amber)',bg:'var(--amber-bg)',people:[
+        {name:'RSM — West',role:'Regional Sales Manager',states:'Maharashtra, Gujarat'},
+        {name:'SH — Maharashtra',role:'State Head',states:'Maharashtra (Mumbai, Nagpur)'},
+        {name:'SH — Gujarat',role:'State Head',states:'Gujarat (Ahmedabad, Surat)'}
+      ]},
+      {name:'South Zone',color:'var(--red)',bg:'var(--red-bg)',people:[
+        {name:'RSM — South',role:'Regional Sales Manager',states:'Karnataka, Kerala, AP, Telangana, TN'},
+        {name:'SH — Karnataka',role:'State Head',states:'Karnataka (Bengaluru)'},
+        {name:'SH — Kerala',role:'State Head',states:'Kerala (Kochi)'},
+        {name:'SH — AP + Telangana',role:'State Head',states:'Andhra Pradesh · Telangana'},
+        {name:'SH — Tamil Nadu',role:'State Head',states:'Tamil Nadu (Chennai, Coimbatore, Madurai)'}
+      ]}
+    ];
+    document.getElementById('team-body').innerHTML=toggle+zones.map(z=>`
+      <div class="zone-block">
+        <div class="zone-label" style="background:${z.bg};border-left-color:${z.color};color:${z.color}">${z.name}</div>
+        <div class="team-grid">${z.people.map(p=>`<div class="team-card">
+          <div class="team-name">${p.name}</div>
+          <div class="team-role">${p.role}</div>
+          <div class="team-states">${p.states}</div>
+        </div>`).join('')}</div>
+      </div>`).join('');
+  } else {
+    renderChannelView(toggle);
+  }
+}
+
+function switchTeamView(v){
+  _teamView=v;
+  renderTeamPage();
+}
+
+function renderChannelView(toggle){
+  const zoneColors={'North':'var(--blue)','East':'var(--green)','West':'var(--amber)','South':'var(--red)'};
+
+  const stateBlocks=states.map(s=>{
+    const sdC=activeSDs(s).length;
+    const valAch=totalValAch(s);
+    const retAch=totalRetAch(s);
+    const zColor=zoneColors[s.zone]||'var(--muted)';
+
+    const sdHtml=s.superDists.map(sd=>{
+      const mds=sd.microDists||[];
+      const sdVal=mds.reduce((a,m)=>a+(m.valueAchievement||0),0);
+      const mdRows=mds.map(md=>`
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;padding:7px 14px 7px 40px;border-bottom:1px solid var(--border);font-size:12px;background:var(--bg)">
+          <div style="color:var(--text)">${md.district}</div>
+          <div style="color:var(--muted)">${md.valueAllocation>0?fmtVal(md.valueAllocation):'—'} alloc</div>
+          <div style="color:var(--text);font-weight:500">${md.valueAchievement>0?fmtVal(md.valueAchievement):'—'}</div>
+          <div style="color:var(--muted)">${md.activeRetailers} retailers &middot; ${md.catARetailers} Cat A</div>
+        </div>`).join('');
+
+      return `<div style="border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface)">
+          <div style="width:3px;height:32px;background:var(--gold);border-radius:2px;flex-shrink:0"></div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">${sd.company||'[Company not set]'}</div>
+            <div style="font-size:11px;color:var(--muted)">${sd.location||''} &middot; ${mds.length} MDs &middot; ${sdVal>0?fmtVal(sdVal)+' achieved':'No data yet'}</div>
+          </div>
+          <span class="badge badge-${sd.status||'partial'}">${sd.status||'partial'}</span>
+        </div>
+        ${mds.length>0?`
+          <div style="border-top:1px dashed var(--border)">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;padding:5px 14px 5px 40px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--muted);background:var(--bg)">
+              <div>District / MD</div><div>Allocation</div><div>Achieved</div><div>Retailers</div>
+            </div>
+            ${mdRows}
+          </div>`:''}
+      </div>`;
+    }).join('');
+
+    return `<div class="acc" style="margin-bottom:14px">
+      <div class="acc-head" onclick="toggleAcc(this)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:4px;height:36px;background:${zColor};border-radius:2px;flex-shrink:0"></div>
+          <div>
+            <div style="font-size:15px;font-weight:600">${s.state}</div>
+            <div style="font-size:11px;color:var(--muted)">${s.zone} Zone &middot; ${sdC}/${s.superDistTarget} SDs</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="text-align:right">
+            <div style="font-size:12px;font-weight:600">${valAch>0?fmtVal(valAch):'No data'}</div>
+            <div style="font-size:11px;color:var(--muted)">${retAch} retailers</div>
+          </div>
+          <button class="btn btn-xs btn-ghost" onclick="event.stopPropagation();navTo('state','${s.state}')">Open &rarr;</button>
+          <span class="acc-arrow">&#9654;</span>
+        </div>
+      </div>
+      <div class="acc-body" style="padding:0">
+        ${s.superDists.length>0?sdHtml:'<div style="padding:16px;color:var(--muted);font-size:13px">No SDs added yet &mdash; <span class="gold-text" style="cursor:pointer" onclick="navTo(\'state\',\''+s.state+'\')">open state to edit</span></div>'}
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('team-body').innerHTML=toggle+stateBlocks.join('');
+}
+
+// ==========================================================
+// EXPANSION PAGE
+// ==========================================================
+function renderExpansionPage(){
+  const items=[
+    {state:'Punjab',priority:'high',color:'var(--red)',bg:'var(--red-bg)',reason:'High urban density, strong retail network. Adjacent to Haryana operations.',next:'Identify SD in Ludhiana / Amritsar'},
+    {state:'Himachal Pradesh',priority:'medium',color:'var(--amber)',bg:'var(--amber-bg)',reason:'Tourism-driven demand. Seasonal but consistent.',next:'Assess demand, identify Shimla-based distributor'},
+    {state:'Uttarakhand',priority:'medium',color:'var(--amber)',bg:'var(--amber-bg)',reason:'Growing urban centres (Dehradun, Haridwar). Close to UP base.',next:'Explore via existing UP SD relationships'},
+    {state:'Madhya Pradesh',priority:'medium',color:'var(--amber)',bg:'var(--amber-bg)',reason:'Large state, underserved. Strategic link between North and South.',next:'Identify distributor in Bhopal / Indore'},
+    {state:'Odisha',priority:'low',color:'var(--muted)',bg:'var(--bg)',reason:'Emerging market. Build after East Zone stabilises.',next:'Monitor, plan for Q3 FY27'},
+    {state:'Goa',priority:'low',color:'var(--muted)',bg:'var(--bg)',reason:'Small but premium market. Tourist-driven.',next:'Assess volume feasibility first'}
+  ];
+
+  document.getElementById('expansion-body').innerHTML=`<div class="exp-grid">${items.map(e=>`
+    <div class="exp-card" style="border-left-color:${e.color}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div class="exp-state">${e.state}</div>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;padding:2px 9px;border-radius:20px;background:${e.bg};color:${e.color}">${e.priority}</span>
+      </div>
+      <div class="exp-reason">${e.reason}</div>
+      <div class="exp-next">&#8594; ${e.next}</div>
+    </div>`).join('')}</div>`;
+}
+
+// ==========================================================
+// MODAL UTILS
+// ==========================================================
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+}
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click',e=>{ if(e.target===o) closeModal(o.id); });
+});
+
+// ==========================================================
+// IMPORT / EXPORT
+// ==========================================================
+function exportData(){
+  const blob=new Blob([JSON.stringify({states,reviews,actionItems,v:2,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='sm-gt-'+todayStr()+'.json';
+  a.click();
+}
+function importData(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(d.states) states=d.states;
+      if(d.reviews) reviews=d.reviews;
+      if(d.actionItems) actionItems=d.actionItems;
+      navTo(_page);
+      alert('Data imported into memory. Note: imported data is not saved to Supabase.');
+    }catch(err){alert('Import error: '+err.message);}
+  };
+  r.readAsText(file);
+}
+
+// ==========================================================
+// INIT
+// ==========================================================
+loadData();
+</script>
+</body>
+</html>
