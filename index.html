@@ -387,7 +387,8 @@ async function loadData() {
       { data: aiData,  error: aiErr },
       { data: rvData,  error: rvErr },
       { data: rmdData, error: rmdErr },
-      { data: ralData, error: ralErr }
+      { data: ralData, error: ralErr },
+      { data: rsdData, error: rsdErr }
     ] = await Promise.all([
       sb.from('states').select('*').order('created_at'),
       sb.from('super_dists').select('*').order('id'),
@@ -395,7 +396,8 @@ async function loadData() {
       sb.from('action_items').select('*').order('created_at'),
       sb.from('reviews').select('*').order('date', { ascending: false }),
       sb.from('review_md_data').select('*'),
-      sb.from('review_action_links').select('*')
+      sb.from('review_action_links').select('*'),
+      sb.from('review_sd_data').select('*')
     ]);
 
     if (sErr) throw sErr;
@@ -427,9 +429,12 @@ async function loadData() {
         location: sd.location || '',
         contact: sd.contact || '',
         appointedDate: sd.appointed_date || '',
+        dob: sd.dob || '',
         status: sd.status || 'partial',
         valueAllocation: parseFloat(sd.value_allocation || 0),
         microDistTarget: sd.micro_dist_target || 0,
+        collectionTarget: parseFloat(sd.collection_target || 0),
+        collectionAchievement: parseFloat(sd.collection_achievement || 0),
         microDists: []
       });
     });
@@ -487,6 +492,19 @@ async function loadData() {
       else if (ral.link_type === 'new') rvAlMap[ral.review_id].newActionIds.push(ral.action_item_id);
     });
 
+    // Build SD company name map and review_sd_data lookup
+    const sdCompanyMap = {};
+    (sdData || []).forEach(sd => { sdCompanyMap[sd.id] = sd.company || ''; });
+    const rvSdMap = {};
+    (rsdData || []).forEach(rsd => {
+      if (!rvSdMap[rsd.review_id]) rvSdMap[rsd.review_id] = [];
+      rvSdMap[rsd.review_id].push({
+        sdId: rsd.super_dist_id,
+        company: sdCompanyMap[rsd.super_dist_id] || '',
+        collectionAchievement: parseFloat(rsd.collection_achievement || 0)
+      });
+    });
+
     // Build reviews
     reviews = (rvData || []).map(r => ({
       id: r.id,
@@ -500,7 +518,8 @@ async function loadData() {
       resolvedIds: (rvAlMap[r.id] || {}).resolvedIds || [],
       carriedIds:  (rvAlMap[r.id] || {}).carriedIds  || [],
       newActionIds:(rvAlMap[r.id] || {}).newActionIds || [],
-      mdData: rvMdMap[r.id] || []
+      mdData: rvMdMap[r.id] || [],
+      sdData: rvSdMap[r.id] || []
     }));
 
   } catch (err) {
@@ -762,11 +781,15 @@ function buildOverviewTab(){
     const sdRet=mds.reduce((a,m)=>a+(m.activeRetailers||0),0);
     const sdRetT=mds.reduce((a,m)=>a+(m.retailerTarget||0),0);
     const vP=pct(sdVal,sd.valueAllocation);
+    const cP=pct(sd.collectionAchievement,sd.collectionTarget);
+    const dobStr=sd.dob?`<div style="font-size:10px;color:var(--muted);margin-top:1px">🎂 ${sd.dob}</div>`:'';
     return `<tr>
-      <td><div class="fw-600">${sd.company||'—'}</div><div style="font-size:11px;color:var(--muted)">${sd.location||''}</div></td>
+      <td><div class="fw-600">${sd.company||'—'}</div><div style="font-size:11px;color:var(--muted)">${sd.location||''}</div>${dobStr}</td>
       <td><span class="badge badge-${sd.status||'partial'}">${sd.status||'partial'}</span></td>
       <td>${sd.valueAllocation>0?fmtVal(sd.valueAllocation):'—'}</td>
       <td><span class="${vP!==null?(vP>=80?'green-text':vP>=40?'amber-text':'red-text'):'muted-text'} fw-600">${sdVal>0?fmtVal(sdVal):'—'}</span>${vP!==null?` <small style="color:var(--muted)">(${vP}%)</small>`:''}</td>
+      <td>${sd.collectionTarget>0?fmtVal(sd.collectionTarget):'—'}</td>
+      <td><span class="${cP!==null?(cP>=80?'green-text':cP>=40?'amber-text':'red-text'):'muted-text'} fw-600">${sd.collectionAchievement>0?fmtVal(sd.collectionAchievement):'—'}</span>${cP!==null?` <small style="color:var(--muted)">(${cP}%)</small>`:''}</td>
       <td>${mds.length} / ${sd.microDistTarget||0}</td>
       <td>${sdRet}${sdRetT>0?' / '+sdRetT:''}</td>
     </tr>`;
@@ -780,8 +803,8 @@ function buildOverviewTab(){
     <div class="sdiv"><span class="sdiv-label">SD Scorecard</span><div class="sdiv-line"></div></div>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>Distributor</th><th>Status</th><th>Val. Allocation</th><th>Achieved</th><th>MDs</th><th>Retailers</th></tr></thead>
-        <tbody>${sdRows||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">No SDs added — use Edit Network to add</td></tr>'}</tbody>
+        <thead><tr><th>Distributor</th><th>Status</th><th>Val. Alloc</th><th>Val. Achieved</th><th>Coll. Target</th><th>Coll. Achieved</th><th>MDs</th><th>Retailers</th></tr></thead>
+        <tbody>${sdRows||'<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted)">No SDs added — use Edit Network to add</td></tr>'}</tbody>
       </table>
     </div>
   </div>
@@ -865,7 +888,10 @@ function buildNetworkTab(){
         <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--muted);margin-bottom:12px">
           ${sd.contact?`<span>&#128222; ${sd.contact}</span>`:''}
           ${sd.appointedDate?`<span>&#128197; Appointed: ${sd.appointedDate}</span>`:''}
+          ${sd.dob?`<span>🎂 DOB: ${sd.dob}</span>`:''}
           <span>Val. Alloc: ${sd.valueAllocation>0?fmtVal(sd.valueAllocation):'Not set'}</span>
+          <span>Coll. Target: ${sd.collectionTarget>0?fmtVal(sd.collectionTarget):'Not set'}</span>
+          ${sd.collectionAchievement>0?`<span style="color:var(--green)">Coll. Achieved: ${fmtVal(sd.collectionAchievement)}</span>`:''}
           <span>MD Target: ${sd.microDistTarget||0}</span>
         </div>
         <table class="tbl tbl-sm" style="background:white;border:1px solid var(--border);border-radius:6px">
@@ -914,6 +940,11 @@ function buildReviewsTab(){
       </div>
       ${r.wins?`<div class="review-section"><div class="review-section-label">Wins</div><div class="review-section-body">${r.wins}</div></div>`:''}
       ${r.issues?`<div class="review-section"><div class="review-section-label">Issues</div><div class="review-section-body">${r.issues}</div></div>`:''}
+      ${r.sdData&&r.sdData.length>0?`<div class="review-section"><div class="review-section-label">Collection Achievement</div>
+        <table class="tbl tbl-sm" style="margin-top:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+          <thead><tr><th>Distributor</th><th>Collected</th></tr></thead>
+          <tbody>${r.sdData.map(sd=>`<tr><td>${sd.company||sd.sdId}</td><td class="fw-600 ${sd.collectionAchievement>0?'green-text':'muted-text'}">${sd.collectionAchievement>0?fmtVal(sd.collectionAchievement):'—'}</td></tr>`).join('')}</tbody>
+        </table></div>`:''}
       ${r.mdData&&r.mdData.length>0?`<div class="review-section"><div class="review-section-label">MD Performance</div>
         <table class="tbl tbl-sm" style="margin-top:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
           <thead><tr><th>District</th><th>Value</th><th>Retailers</th><th>Cat A</th></tr></thead>
@@ -948,6 +979,21 @@ function openReviewModal(){
         </label>`).join('')}
       </div>
       <div class="form-hint">Unchecked = carried forward automatically</div>
+    </div>`:'';
+
+  const sdColHtml=activeSDs(s).length>0?`
+    <div class="form-group">
+      <label class="form-label">Collection Achievement per SD <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">&mdash; enter &#8377; collected this period</span></label>
+      <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <table class="tbl tbl-sm" style="background:var(--surface)">
+          <thead style="background:var(--bg)"><tr><th>Distributor</th><th>Target</th><th>Collection Achieved (&#8377;)</th></tr></thead>
+          <tbody>${activeSDs(s).map(sd=>`<tr>
+            <td class="fw-600">${sd.company||'[No name]'} <span style="font-weight:400;color:var(--muted);font-size:11px">${sd.location||''}</span></td>
+            <td style="color:var(--muted)">${sd.collectionTarget>0?fmtVal(sd.collectionTarget):'—'}</td>
+            <td><input type="number" class="form-input" id="rv-coll-${sd.id}" value="${sd.collectionAchievement||0}" min="0" style="padding:5px 8px;font-size:12px"></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
     </div>`:'';
 
   const mdHtml=mds.length>0?`
@@ -995,6 +1041,7 @@ function openReviewModal(){
       <label class="form-label">Issues &amp; Challenges</label>
       <textarea class="form-input form-textarea" id="rv-issues" placeholder="Blockers, gaps, underperformance..."></textarea>
     </div>
+    ${sdColHtml}
     ${aiHtml}
     ${mdHtml}
     <div class="form-group">
@@ -1083,7 +1130,18 @@ async function saveReview(){
     await sb.from('review_action_links').insert(actionLinks);
   }
 
-  reviews.unshift({id:reviewId,state:s.state,date,reviewer,sdCount,stateValue,wins,issues,resolvedIds,carriedIds,newActionIds,mdData});
+  // SD collection achievement
+  const sdDataArr=[];const sdDbRows2=[];
+  for(const sd of activeSDs(s)){
+    const collAch=+(document.getElementById('rv-coll-'+sd.id)?.value||0);
+    sd.collectionAchievement=collAch;
+    sdDataArr.push({sdId:sd.id,company:sd.company||'',collectionAchievement:collAch});
+    sdDbRows2.push({review_id:reviewId,super_dist_id:sd.id,collection_achievement:collAch});
+    await sb.from('super_dists').update({collection_achievement:collAch}).eq('id',sd.id);
+  }
+  if(sdDbRows2.length>0){ await sb.from('review_sd_data').insert(sdDbRows2); }
+
+  reviews.unshift({id:reviewId,state:s.state,date,reviewer,sdCount,stateValue,wins,issues,resolvedIds,carriedIds,newActionIds,mdData,sdData:sdDataArr});
   closeModal('modal-review');
   renderStatePage();
 }
@@ -1131,20 +1189,26 @@ function openNetworkModal(){
         <div class="form-group"><label class="form-label">Appointed Date</label><input type="date" class="form-input" id="net-sddate-${sd.id}" value="${sd.appointedDate||''}"></div>
       </div>
       <div class="form-row">
+        <div class="form-group"><label class="form-label">Date of Birth 🎂</label><input type="date" class="form-input" id="net-sddob-${sd.id}" value="${sd.dob||''}"><div class="form-hint">Used to send birthday wishes to the SD</div></div>
+        <div class="form-group"></div>
+      </div>
+      <div class="form-row-3">
         <div class="form-group"><label class="form-label">Value Allocation (&#8377;)</label><input type="number" class="form-input" id="net-sdval-${sd.id}" value="${sd.valueAllocation||0}" min="0"></div>
+        <div class="form-group"><label class="form-label">Collection Target (&#8377;)</label><input type="number" class="form-input" id="net-sdct-${sd.id}" value="${sd.collectionTarget||0}" min="0"></div>
         <div class="form-group"><label class="form-label">MD Target</label><input type="number" class="form-input" id="net-sdmdt-${sd.id}" value="${sd.microDistTarget||0}" min="0"></div>
       </div>
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin:8px 0">Micro Distributors</div>
       <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden">
         <table class="tbl tbl-sm" style="background:white">
           <thead style="background:var(--bg)"><tr><th>District</th><th>Val. Alloc (&#8377;)</th><th>Retailer Target</th></tr></thead>
-          <tbody>${(sd.microDists||[]).map(md=>`<tr>
+          <tbody id="md-tbody-${sd.id}">${(sd.microDists||[]).map(md=>`<tr>
             <td><input class="form-input" id="net-mdd-${md.id}" value="${md.district||''}" style="padding:4px 7px;font-size:12px"></td>
             <td><input type="number" class="form-input" id="net-mdv-${md.id}" value="${md.valueAllocation||0}" min="0" style="padding:4px 7px;font-size:12px"></td>
             <td><input type="number" class="form-input" id="net-mdr-${md.id}" value="${md.retailerTarget||0}" min="0" style="padding:4px 7px;font-size:12px"></td>
           </tr>`).join('')}</tbody>
         </table>
       </div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;justify-content:center" onclick="addMDRow('${sd.id}')">+ Add Micro Distributor</button>
     </div>`;
   });
 
@@ -1167,7 +1231,9 @@ async function saveNetwork(){
     if(g('net-sdloc-'+sd.id)) sd.location=g('net-sdloc-'+sd.id).value.trim();
     if(g('net-sdcon-'+sd.id)) sd.contact=g('net-sdcon-'+sd.id).value.trim();
     if(g('net-sddate-'+sd.id)) sd.appointedDate=g('net-sddate-'+sd.id).value;
+    if(g('net-sddob-'+sd.id)) sd.dob=g('net-sddob-'+sd.id).value;
     if(g('net-sdval-'+sd.id)) sd.valueAllocation=+g('net-sdval-'+sd.id).value;
+    if(g('net-sdct-'+sd.id)) sd.collectionTarget=+g('net-sdct-'+sd.id).value;
     if(g('net-sdmdt-'+sd.id)) sd.microDistTarget=+g('net-sdmdt-'+sd.id).value;
     if(g('net-sdst-'+sd.id)) sd.status=g('net-sdst-'+sd.id).value;
 
@@ -1175,8 +1241,10 @@ async function saveNetwork(){
       id:sd.id, state_id:s._id,
       company:sd.company, location:sd.location, contact:sd.contact,
       appointed_date:sd.appointedDate||null,
+      dob:sd.dob||null,
       status:sd.status,
       value_allocation:sd.valueAllocation,
+      collection_target:sd.collectionTarget,
       micro_dist_target:sd.microDistTarget
     });
 
@@ -1195,10 +1263,44 @@ async function saveNetwork(){
         value_achievement:md.valueAchievement
       });
     }
+
+    // Handle newly added MD rows
+    const newMdRows=document.querySelectorAll('[data-new-md][data-sd-id="'+sd.id+'"]');
+    for(const row of newMdRows){
+      const newId=row.getAttribute('data-new-md');
+      const district=(g('net-mdd-'+newId)?.value||'').trim();
+      if(!district) continue;
+      const valAlloc=+(g('net-mdv-'+newId)?.value||0);
+      const retTarget=+(g('net-mdr-'+newId)?.value||0);
+      const newMd={id:newId,district,valueAllocation:valAlloc,retailerTarget:retTarget,activeRetailers:0,catARetailers:0,valueAchievement:0};
+      sd.microDists.push(newMd);
+      await sb.from('micro_dists').insert({
+        id:newId,super_dist_id:sd.id,district,
+        value_allocation:valAlloc,retailer_target:retTarget,
+        active_retailers:0,cat_a_retailers:0,value_achievement:0
+      });
+    }
   }
 
   closeModal('modal-network');
   renderStatePage();
+}
+
+// ==========================================================
+// ADD MD ROW (Fix 2: unlimited MDs per SD)
+// ==========================================================
+function addMDRow(sdId){
+  const tbody=document.getElementById('md-tbody-'+sdId);
+  if(!tbody) return;
+  const newId='md-'+uid();
+  const tr=document.createElement('tr');
+  tr.setAttribute('data-new-md',newId);
+  tr.setAttribute('data-sd-id',sdId);
+  tr.innerHTML=
+    '<td><input class="form-input" id="net-mdd-'+newId+'" placeholder="District name" style="padding:4px 7px;font-size:12px"></td>'+
+    '<td><input type="number" class="form-input" id="net-mdv-'+newId+'" value="0" min="0" style="padding:4px 7px;font-size:12px"></td>'+
+    '<td><input type="number" class="form-input" id="net-mdr-'+newId+'" value="0" min="0" style="padding:4px 7px;font-size:12px"></td>';
+  tbody.appendChild(tr);
 }
 
 // ==========================================================
